@@ -1,11 +1,11 @@
 #include "Arduino.h"
 #include "MorseBinNET2.h"
-MorseBinNET2::MorseBinNET2(String address, int pinTransmit,int pinReceive){
+MorseBinNET2::MorseBinNET2(String address, int pinTransmit){
 	_pinTransmit = pinTransmit;
-	_pinReceive = pinReceive;
 	_address = address;
-	pinMode(_pinTransmit,OUTPUT);
-	pinMode(_pinReceive,INPUT);
+	pinMode(_pinTransmit,INPUT);
+	timeMiddle = ((time0+time1)/2);
+	timeForStart = ((time0+time1)-(time1/2));
 }
 void MorseBinNET2::send(String address, String data1, String data2){
 		sendByte(address, _pinTransmit);
@@ -14,28 +14,49 @@ void MorseBinNET2::send(String address, String data1, String data2){
 		sendByte(data2, _pinTransmit);
 }
 void MorseBinNET2::receive(){
-	String receiverAddress = receiveByte(_pinReceive);
+	String receiverAddress = receiveByte(_pinTransmit);
 	if((receiverAddress == "errTimeout")){
 		lastMessage[0] = "errTimeout";
 		return;
+	} else {
+		if(receiverAddress == "errGrabledMessage"){
+			lastMessage[0] = "errGrabledMessage";
+			return;
+		}
 	}
-	String senderAddress = receiveByte(_pinReceive);
+	String senderAddress = receiveByte(_pinTransmit);
 	if(senderAddress == "errTimeout"){
 		lastMessage[0] = "errTimeout";
 		return;
+	} else {
+		if(senderAddress == "errGrabledMessage"){
+			lastMessage[0] = "errGrabledMessage";
+			return;
+		}
 	}
-	String data1 = receiveByte(_pinReceive);
+	String data1 = receiveByte(_pinTransmit);
 	if(data1 == "errTimeout"){
 		lastMessage[0] = "errTimeout";
 		return;
+	} else {
+		if(data1 == "errGrabledMessage"){
+			lastMessage[0] = "errGrabledMessage";
+			return;
+		}
 	}
-	String data2 = receiveByte(_pinReceive);
+	String data2 = receiveByte(_pinTransmit);
 	if(data2 == "errTimeout"){
 		lastMessage[0] = "errTimeout";
 		return;
+	} else {
+		if(data2 == "errGrabledMessage"){
+			lastMessage[0] = "errGrabledMessage";
+			return;
+		}
 	}
 	if(_address != receiverAddress){
 		lastMessage[0] = "errWrongAddress";
+		Serial.println(_address + ":" + receiverAddress);
 		return;
 	}
 	lastMessage[1] = senderAddress;
@@ -48,22 +69,27 @@ String MorseBinNET2::placeRequest(String address, String data1, String data2) {
 }
 void MorseBinNET2::Send0(int sendpin) {
  	digitalWrite(sendpin,HIGH);
- 	delay(time0);
+ 	delayMicroseconds(time0);
  	digitalWrite(sendpin,LOW);
- 	delay(time1);
+ 	delayMicroseconds(time1);
   }
 void MorseBinNET2::Send1(int sendpin) {
  	digitalWrite(sendpin,HIGH);
- 	delay(time1);
+ 	delayMicroseconds(time1);
  	digitalWrite(sendpin,LOW);
- 	delay(time1);
+ 	delayMicroseconds(time1);
   }
 void MorseBinNET2::sendByte(String input,int sendpin){
+	while(digitalRead(sendpin) == HIGH){
+		delayMicroseconds(time1+5);
+		//Serial.println("StuckInTraffic");
+	}
+	pinMode(sendpin,OUTPUT);
     	//Serial.println("gotit");
 	digitalWrite(sendpin,HIGH);
-	delay(time0+time1);
+	delayMicroseconds(time0+time1);
 	digitalWrite(sendpin,LOW);
-	delay(time1);
+	delayMicroseconds(time1);
    	 for (int i=0;i<8;i++){
     		if (input.charAt(i)=='1'){
      		 Send1(sendpin);
@@ -74,47 +100,54 @@ void MorseBinNET2::sendByte(String input,int sendpin){
       		//Serial.println("gotit0");
       }
     }
+	pinMode(sendpin,INPUT);
   }
   String MorseBinNET2::receiveByte(int respin){
-	  String buf;
+	String buf;
   	int waitTimer = 0;
 	int timeouttimer = 0;
 	while(digitalRead(respin)==LOW){
-		timeouttimer++;
-    		delay(1);
-    		if(timeouttimer>=10000){
+		timeouttimer+=8;
+    	delayMicroseconds(8);
+    	if(timeouttimer>=30000){
       		return "errTimeout";
 	  	}
 	}
+	int microTimer = micros();
 	while(digitalRead(respin) == HIGH){
-		waitTimer++;
-		delay(1);
 	}
- 	if(waitTimer>time0+time1-2){
+	waitTimer = micros() - microTimer;
+ 	if(waitTimer>timeForStart){
 	} else {
-		return "errTimeout";
+		//Serial.println(waitTimer);
+		//Serial.print("StartTime should be: ");
+		//Serial.println(timeForStart);
+		return "errGrabledMessage";
 	}
  	for (int i=0;i<8;i++){
- 	int timer = 0;
-   	while (digitalRead(respin)==LOW){
-    		timer++;
-    		delay(1);
-    		if(timer>=10000){
-      		timer = 0;
-      		return "errTimeout";
-	  		}
-    	}
-    	int t = 0;
-    	while(digitalRead(respin)==HIGH) {
-      		t++;
-      		delay(1);
-     	}
-      	if (t > (time0+time1)/2 && t < time0+time1) {
-        	buf += "0";
-        }
-        else {
-          	buf += "1";
-          }   
+		int timer = 0;
+		while (digitalRead(respin)==LOW){
+			timer++;
+			delayMicroseconds(8);
+			if(timer>=10000){
+				timer = 0;
+				return "errTimeout";
+			}
+		}
+		int microStart = micros();
+		while(digitalRead(respin)==HIGH) {
+		}
+		int t = micros() - microStart;
+		if (t > timeMiddle && t < timeForStart) {
+			buf += "0";
+		}
+		else {
+			if(t < timeMiddle && t < timeForStart){
+				buf += "1";
+				} else {
+					buf += "n";
+				}      	
+			}   
     }
-    	return buf;
+    return buf;
   }

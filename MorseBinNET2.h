@@ -3,7 +3,7 @@
 #include "Arduino.h"
 	class MorseBinNET2 {
 		public:
-			MorseBinNET2(String address, int pinTransmit,int pinReceive);
+			MorseBinNET2(String address, int pinTransmit);
 			void send(String address, String data1, String data2);
 			void receive();
 			String placeRequest(String address, String data1, String data2);
@@ -16,7 +16,9 @@
 			void Send0(int sendpin);
 			void Send1(int sendpin);
 			String receiveByte(int resPin);
-			const int time1 = 4;
-			const int time0 = 10;
+			int time1 = 48;
+			int time0 = 144;
+			int timeMiddle = 0;
+			int timeForStart = 0;
 	};
 #endif
