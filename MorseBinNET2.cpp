@@ -10,6 +10,14 @@ MorseBinNET2::MorseBinNET2(String address, int pinTransmit){
 void MorseBinNET2::send(String address, String data1, String data2){
 		sendByte(address, _pinTransmit);
 		sendByte(_address, _pinTransmit);
+		sendByte("00000000",_pinTransmit);
+		sendByte(data1, _pinTransmit);
+		sendByte(data2, _pinTransmit);
+}
+void MorseBinNET2::send(String address,String busID, String data1, String data2){
+		sendByte(address, _pinTransmit);
+		sendByte(_address, _pinTransmit);
+		sendByte(busID,_pinTransmit);
 		sendByte(data1, _pinTransmit);
 		sendByte(data2, _pinTransmit);
 }
@@ -30,6 +38,16 @@ void MorseBinNET2::receive(){
 		return;
 	} else {
 		if(senderAddress == "errGrabledMessage"){
+			lastMessage[0] = "errGrabledMessage";
+			return;
+		}
+	}
+	String senderBusID = receiveByte(_pinTransmit);
+	if(senderBusID == "errTimeout"){
+		lastMessage[0] = "errTimeout";
+		return;
+	} else {
+		if(senderBusID == "errGrabledMessage"){
 			lastMessage[0] = "errGrabledMessage";
 			return;
 		}
@@ -56,8 +74,13 @@ void MorseBinNET2::receive(){
 	}
 	if(_address != receiverAddress){
 		lastMessage[0] = "errWrongAddress";
-		Serial.println(_address + ":" + receiverAddress);
+		//Serial.println(_address + ":" + receiverAddress);
 		return;
+	}
+	if(senderBusID == "00000000"){
+		lastMessage[4] = "local";
+	} else{
+		lastMessage[4] = senderBusID;
 	}
 	lastMessage[1] = senderAddress;
 	lastMessage[2] = data1;
